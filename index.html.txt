@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Virtual Lab - การเปลี่ยนสถานะของสาร</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+    margin:0;
+    font-family:Arial,sans-serif;
+    background:#eef4fb;
+    color:#222;
+}
+
+header{
+    background:#0b5394;
+    color:white;
+    padding:16px;
+    text-align:center;
+}
+
+.container{
+    max-width:1200px;
+    margin:auto;
+    padding:20px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+.card{
+    background:white;
+    border-radius:16px;
+    padding:20px;
+    box-shadow:0 2px 10px rgba(0,0,0,.1);
+}
+
+canvas{
+    width:100%;
+    background:#fafafa;
+    border-radius:12px;
+}
+
+button{
+    padding:10px 15px;
+    margin:5px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:15px;
+}
+
+.start{background:#2e8b57;color:white;}
+.stop{background:#d9534f;color:white;}
+.reset{background:#0275d8;color:white;}
+.heat{background:#ff9800;color:white;}
+.cool{background:#00acc1;color:white;}
+
+.info{
+    font-size:18px;
+    line-height:1.8;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th,td{
+    border:1px solid #ccc;
+    padding:6px;
+    text-align:center;
+}
+
+th{
+    background:#d9edf7;
+}
+
+@media(max-width:900px){
+.grid{
+grid-template-columns:1fr;
+}
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>Virtual Laboratory : อุณหภูมิกับการเปลี่ยนสถานะของสาร</h1>
+<p>Interactive Simulation สำหรับการเรียนการสอนวิทยาศาสตร์</p>
+</header>
+
+<div class="container">
+
+<div class="grid">
+
+<div class="card">
+
+<h2>ห้องทดลองเสมือนจริง</h2>
+
+<canvas id="labCanvas" width="500" height="400"></canvas>
+
+<div style="margin-top:10px;">
+<button class="start" onclick="startSim()">เริ่มทดลอง</button>
+<button class="stop" onclick="pauseSim()">หยุด</button>
+<button class="reset" onclick="resetSim()">เริ่มใหม่</button>
+<button class="heat" onclick="increaseHeat()">เพิ่มความร้อน</button>
+<button class="cool" onclick="decreaseHeat()">ลดความร้อน</button>
+</div>
+
+<div class="info">
+เวลา: <span id="time">0</span> นาที<br>
+อุณหภูมิ: <span id="temp">-10</span> °C<br>
+กำลังความร้อน: <span id="power">1</span>x<br>
+สถานะ: <span id="phase">ของแข็ง</span>
+</div>
+
+</div>
+
+<div class="card">
+
+<h2>กราฟอุณหภูมิกับเวลา</h2>
+
+<canvas id="chartCanvas"></canvas>
+
+</div>
+
+</div>
+
+<div class="card">
+
+<h2>ตารางบันทึกผลการทดลอง</h2>
+
+<table>
+<thead>
+<tr>
+<th>เวลา</th>
+<th>อุณหภูมิ</th>
+<th>สถานะ</th>
+</tr>
+</thead>
+
+<tbody id="tableBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("labCanvas");
+const ctx = canvas.getContext("2d");
+
+let time = 0;
+let temp = -10;
+let heatPower = 1;
+let interval = null;
+
+let chartData = [];
+let labels = [];
+
+const chart = new Chart(document.getElementById('chartCanvas'), {
+type:'line',
+data:{
+labels:labels,
+datasets:[{
+label:'อุณหภูมิ',
+data:chartData,
+fill:false,
+borderWidth:3
+}]
+},
+options:{
+responsive:true,
+animation:false
+}
+});
+
+function getPhase(){
+
+if(temp < 0) return "ของแข็ง";
+
+if(temp === 0) return "กำลังหลอมเหลว";
+
+if(temp > 0 && temp < 100) return "ของเหลว";
+
+if(temp === 100) return "กำลังเดือด";
+
+return "แก๊ส";
+
+}
+
+function updateSim(){
+
+time++;
+
+if(temp < 0){
+temp += 1 * heatPower;
+}
+else if(temp === 0 && time < 15){
+temp = 0;
+}
+else if(temp < 100){
+temp += 2 * heatPower;
+}
+else if(temp === 100 && time < 35){
+temp = 100;
+}
+else{
+temp += 1;
+}
+
+document.getElementById("time").innerText = time;
+document.getElementById("temp").innerText = temp;
+document.getElementById("power").innerText = heatPower;
+document.getElementById("phase").innerText = getPhase();
+
+drawLab();
+
+labels.push(time);
+chartData.push(temp);
+
+chart.update();
+
+if(time % 2 === 0){
+
+const row = document.createElement("tr");
+
+row.innerHTML = `
+<td>${time}</td>
+<td>${temp}</td>
+<td>${getPhase()}</td>
+`;
+
+document.getElementById("tableBody").appendChild(row);
+
+}
+
+}
+
+function drawLab(){
+
+ctx.clearRect(0,0,500,400);
+
+ctx.strokeRect(170,60,160,230);
+
+if(getPhase().includes("ของแข็ง") || getPhase().includes("หลอม")){
+
+ctx.fillStyle="#9dd9ff";
+
+for(let i=0;i<5;i++){
+
+ctx.fillRect(
+190 + (i%2)*50,
+220 - i*20,
+40,
+40
+);
+
+}
+
+}
+
+if(getPhase().includes("ของเหลว") || getPhase().includes("เดือด")){
+
+ctx.fillStyle="#4aa3ff";
+
+ctx.fillRect(172,190,156,96);
+
+}
+
+if(getPhase().includes("เดือด") || getPhase().includes("แก๊ส")){
+
+ctx.fillStyle="rgba(180,180,180,0.5)";
+
+for(let i=0;i<12;i++){
+
+ctx.beginPath();
+
+ctx.arc(
+200+Math.random()*100,
+120-Math.random()*50,
+15,
+0,
+Math.PI*2
+);
+
+ctx.fill();
+
+}
+
+}
+
+ctx.fillStyle="orange";
+
+ctx.beginPath();
+
+ctx.moveTo(250,320);
+ctx.lineTo(220,380);
+ctx.lineTo(280,380);
+
+ctx.closePath();
+
+ctx.fill();
+
+}
+
+function startSim(){
+
+if(!interval){
+
+interval = setInterval(updateSim,1000);
+
+}
+
+}
+
+function pauseSim(){
+
+clearInterval(interval);
+
+interval = null;
+
+}
+
+function resetSim(){
+
+pauseSim();
+
+time = 0;
+temp = -10;
+heatPower = 1;
+
+labels.length = 0;
+chartData.length = 0;
+
+chart.update();
+
+document.getElementById("tableBody").innerHTML="";
+
+document.getElementById("time").innerText=time;
+document.getElementById("temp").innerText=temp;
+document.getElementById("phase").innerText="ของแข็ง";
+document.getElementById("power").innerText=heatPower;
+
+drawLab();
+
+}
+
+function increaseHeat(){
+
+heatPower++;
+
+}
+
+function decreaseHeat(){
+
+if(heatPower>1){
+
+heatPower--;
+
+}
+
+}
+
+drawLab();
+
+</script>
+
+</body>
+</html>
